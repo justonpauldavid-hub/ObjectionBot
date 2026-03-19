@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEPQ Objection Handler</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #13131a; --surface2: #1c1c26;
+    --border: rgba(255,255,255,0.08); --border-bright: rgba(255,255,255,0.15);
+    --accent: #e8ff47; --accent2: #47c8ff; --accent3: #ff6b47;
+    --accent-comp: #ff3d7f;
+    --text: #f0f0f5; --muted: #7a7a8c;
+    --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; display: flex; flex-direction: column; }
+
+  header { padding: 1.25rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; position: sticky; top: 0; background: rgba(10,10,15,0.93); backdrop-filter: blur(12px); z-index: 100; }
+  .logo-pill { background: var(--accent); color: #0a0a0f; font-family: var(--font-head); font-weight: 800; font-size: 13px; letter-spacing: 0.08em; padding: 5px 12px; border-radius: 100px; }
+  header h1 { font-family: var(--font-head); font-size: 18px; font-weight: 700; }
+  header span.sub { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+  .app { display: flex; flex: 1; height: calc(100vh - 61px); overflow: hidden; }
+
+  .sidebar { width: 260px; min-width: 260px; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .sidebar-header h2 { font-family: var(--font-head); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  #clear-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-family: var(--font-body); font-size: 11px; padding: 3px 9px; border-radius: 100px; cursor: pointer; transition: all 0.15s; }
+  #clear-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+  .history-list { flex: 1; overflow-y: auto; padding: 0.6rem; display: flex; flex-direction: column; gap: 5px; }
+  .history-list::-webkit-scrollbar { width: 3px; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }
+  .history-item { padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; background: var(--surface); }
+  .history-item:hover { border-color: var(--border-bright); background: var(--surface2); }
+  .history-item.active { border-color: var(--accent); background: rgba(232,255,71,0.05); }
+  .h-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+  .h-cat { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--accent); }
+  .h-comp-badge { font-size: 9px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; background: rgba(255,61,127,0.15); color: var(--accent-comp); border: 1px solid rgba(255,61,127,0.3); padding: 1px 6px; border-radius: 100px; }
+  .h-text { font-size: 12px; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .h-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .empty-history { text-align: center; color: var(--muted); font-size: 13px; padding: 2rem 1rem; line-height: 1.6; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .input-zone { padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+
+  .field label { display: block; font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .field select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--font-body); font-size: 13px; padding: 9px 11px; border-radius: 9px; outline: none; transition: border-color 0.15s; appearance: none; cursor: pointer; }
+  .field select:hover { border-color: var(--border-bright); }
+  .field select:focus { border-color: var(--accent); }
+  .field.comp-field select { border-color: rgba(255,61,127,0.3); background: rgba(255,61,127,0.04); }
+  .field.comp-field select:focus { border-color: var(--accent-comp); }
+  .field.comp-field label { color: var(--accent-comp); }
+
+  .comp-preview { font-size: 12px; color: var(--muted); padding: 9px 11px; background: rgba(255,61,127,0.05); border: 1px solid rgba(255,61,127,0.2); border-radius: 9px; line-height: 1.5; margin-top: 8px; display: none; }
+  .comp-preview span { color: var(--accent-comp); font-weight: 500; }
+
+  .objection-wrap { margin-bottom: 10px; margin-top: 10px; }
+  .objection-wrap textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--font-body); font-size: 15px; padding: 12px 14px; border-radius: 11px; outline: none; resize: none; min-height: 72px; line-height: 1.6; transition: border-color 0.15s; }
+  .objection-wrap textarea:hover { border-color: var(--border-bright); }
+  .objection-wrap textarea:focus { border-color: var(--accent); }
+  .objection-wrap textarea::placeholder { color: var(--muted); }
+
+  .submit-row { display: flex; align-items: center; gap: 12px; }
+  #analyze-btn { background: var(--accent); color: #0a0a0f; font-family: var(--font-head); font-weight: 700; font-size: 14px; padding: 11px 26px; border-radius: 9px; border: none; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px; }
+  #analyze-btn:hover { background: #f5ff6e; transform: translateY(-1px); }
+  #analyze-btn:active { transform: translateY(0); }
+  #analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .spinner { width: 15px; height: 15px; border: 2px solid rgba(0,0,0,0.2); border-top-color: #0a0a0f; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hint-text { font-size: 12px; color: var(--muted); }
+
+  .output-zone { flex: 1; overflow-y: auto; padding: 1.75rem; }
+  .output-zone::-webkit-scrollbar { width: 4px; }
+  .output-zone::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }
+
+  .welcome-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
+  .welcome-icon { width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, rgba(232,255,71,0.12), rgba(71,200,255,0.08)); border: 1px solid var(--border-bright); display: flex; align-items: center; justify-content: center; font-size: 26px; }
+  .welcome-state h2 { font-family: var(--font-head); font-size: 20px; font-weight: 700; }
+  .welcome-state p { color: var(--muted); font-size: 14px; max-width: 360px; line-height: 1.7; }
+  .sample-btns { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-top: 6px; }
+  .sample-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--font-body); font-size: 12px; padding: 6px 13px; border-radius: 100px; cursor: pointer; transition: all 0.15s; }
+  .sample-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .result-card { max-width: 800px; display: flex; flex-direction: column; gap: 14px; animation: fadeUp 0.3s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .result-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tag { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 11px; border-radius: 100px; border: 1px solid; }
+  .tag-cat { background: rgba(232,255,71,0.1); color: var(--accent); border-color: rgba(232,255,71,0.3); }
+  .tag-tone { background: rgba(71,200,255,0.1); color: var(--accent2); border-color: rgba(71,200,255,0.3); }
+  .tag-comp { background: rgba(255,61,127,0.1); color: var(--accent-comp); border-color: rgba(255,61,127,0.3); }
+
+  .objection-quote { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent3); border-radius: 0 9px 9px 0; padding: 12px 14px; font-size: 15px; font-style: italic; color: var(--text); line-height: 1.6; }
+
+  .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 1.1rem 1.4rem; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .section-label::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+
+  .comp-intel-card { background: rgba(255,61,127,0.04); border: 1px solid rgba(255,61,127,0.22); border-radius: 13px; padding: 1.1rem 1.4rem; }
+  .comp-intel-card .section-label { color: var(--accent-comp); }
+  .comp-intel-card .section-label::before { background: var(--accent-comp); }
+  .intel-list { display: flex; flex-direction: column; gap: 9px; }
+  .intel-item { display: flex; gap: 10px; align-items: flex-start; }
+  .intel-icon { color: var(--accent-comp); font-size: 14px; line-height: 1.4; flex-shrink: 0; }
+  .intel-text { font-size: 13px; line-height: 1.6; color: var(--text); }
+  .intel-text strong { color: var(--accent-comp); font-weight: 600; }
+
+  .concern-text { font-size: 14px; line-height: 1.7; color: var(--text); }
+
+  .questions-list { display: flex; flex-direction: column; gap: 8px; }
+  .question-item { display: flex; gap: 12px; align-items: flex-start; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; transition: border-color 0.15s; }
+  .question-item:hover { border-color: var(--border-bright); }
+  .q-bullet { color: var(--accent); font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+  .q-content { flex: 1; }
+  .q-type { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .q-text { font-size: 16px; font-weight: 500; line-height: 1.5; color: var(--text); }
+
+  .warning-card { background: rgba(255,107,71,0.05); border: 1px solid rgba(255,107,71,0.2); border-radius: 13px; padding: 1.1rem 1.4rem; }
+  .warning-card .section-label::before { background: var(--accent3); }
+  .warning-text { font-size: 13px; line-height: 1.6; color: var(--text); font-style: italic; border-left: 2px solid rgba(255,107,71,0.4); padding-left: 12px; }
+
+  .loading-card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 1.1rem 1.4rem; display: flex; flex-direction: column; gap: 9px; }
+  .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 7px; height: 13px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .sk-line.short { width: 30%; } .sk-line.med { width: 60%; } .sk-line.long { width: 88%; }
+  .error-card { background: rgba(255,107,71,0.05); border: 1px solid rgba(255,107,71,0.25); border-radius: 13px; padding: 1.4rem; color: var(--accent3); font-size: 14px; line-height: 1.6; }
+
+  @media (max-width: 750px) {
+    .sidebar { display: none; }
+    .input-grid { grid-template-columns: 1fr; }
+    .input-zone, .output-zone { padding: 1rem; }
+    header span.sub { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-pill">NEPQ</div>
+  <h1>Objection Handler</h1>
+  <span class="sub">Jeremy Miner Methodology</span>
+</header>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>History</h2>
+      <button id="clear-btn" onclick="clearHistory()">Clear all</button>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="empty-history">No analyses yet.<br/>Your history will appear here.</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="input-zone">
+      <div class="input-grid">
+        <div class="field">
+          <label>Sales Context</label>
+          <select id="context-select">
+            <option value="">Select context (optional)</option>
+            <option value="Cold call">Cold call</option>
+            <option value="Discovery call">Discovery call</option>
+            <option value="Demo / Presentation">Demo / Presentation</option>
+            <option value="Follow-up call">Follow-up call</option>
+            <option value="Proposal / Close">Proposal / Close</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Industry</label>
+          <select id="industry-select">
+            <option value="">Select industry (optional)</option>
+            <option value="General B2B">General B2B</option>
+            <option value="Trucking / Transportation">Trucking / Transportation</option>
+            <option value="Factoring / Finance">Factoring / Finance</option>
+            <option value="Fuel Cards / Fleet">Fuel Cards / Fleet</option>
+            <option value="Freight Brokerage">Freight Brokerage</option>
+            <option value="SaaS / Software">SaaS / Software</option>
+            <option value="Insurance">Insurance</option>
+            <option value="Staffing / Recruiting">Staffing / Recruiting</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field comp-field">
+        <label>⚔ Fuel Card Competitor</label>
+        <select id="competitor-select">
+          <option value="">No competitor — general objection</option>
+          <option value="TCS Fuel Cards">TCS Fuel Cards</option>
+          <option value="Comdata">Comdata</option>
+          <option value="RTS Financial">RTS Financial</option>
+          <option value="MudFlap">MudFlap</option>
+        </select>
+      </div>
+
+      <div class="comp-preview" id="comp-preview">
+        <span id="comp-preview-text"></span>
+      </div>
+
+      <div class="objection-wrap">
+        <textarea id="objection-input" placeholder='Type the prospect\'s objection… e.g. "We already use TCS and we\'re good."' rows="3"></textarea>
+      </div>
+      <div class="submit-row">
+        <button id="analyze-btn" onclick="analyzeObjection()">
+          <div class="spinner" id="spinner"></div>
+          <span id="btn-label">Analyze Objection</span>
+        </button>
+        <span class="hint-text">Ctrl+Enter to submit</span>
+      </div>
+    </div>
+
+    <div class="output-zone" id="output-zone">
+      <div class="welcome-state">
+        <div class="welcome-icon">🎯</div>
+        <h2>NEPQ Objection Analyzer</h2>
+        <p>Pick a competitor to load their real weaknesses into the questions — then drop the objection and go.</p>
+        <div class="sample-btns">
+          <button class="sample-btn" onclick="loadSample(`We already use TCS and we like them.`, `TCS Fuel Cards`)">TCS — happy with them</button>
+          <button class="sample-btn" onclick="loadSample(`We've been with Comdata for years, they take care of us.`, `Comdata`)">Comdata — loyal customer</button>
+          <button class="sample-btn" onclick="loadSample(`MudFlap saves us money, we don't need anything else.`, `MudFlap`)">MudFlap — saves us money</button>
+          <button class="sample-btn" onclick="loadSample(`RTS handles everything for us, we're happy.`, `RTS Financial`)">RTS — we're all set</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const COMPETITOR_INTEL = {
+  "TCS Fuel Cards": {
+    summary: "⚡ $1.50 in-network transaction fee kicks in at 125+ gallons — quietly eats ~5¢/gallon off the discount",
+    bullets: [
+      { label: "Transaction Fee", detail: "$1.50 in-network fee applies when a driver fills up 125 gallons or more in one stop — that knocks roughly 5 cents per gallon off the advertised discount." },
+      { label: "High-Volume Trucks Hurt Most", detail: "The bigger the fill-up, the bigger the hit. Fleets running high-mileage trucks often lose the most and don't realize it." },
+      { label: "Hidden on the Report", detail: "Most prospects don't catch this until they actually pull their savings report and the numbers don't add up to what they were told." }
+    ],
+    promptContext: `TCS charges a $1.50 in-network transaction fee that kicks in when a driver buys 125 gallons or more in a single stop — this quietly knocks about 5 cents per gallon off the advertised discount. High-volume trucks get hit hardest. Most customers don't realize this until they check their report.`
+  },
+  "Comdata": {
+    summary: "⚡ Old platform + notoriously slow support — billing and card issues can take months to fix",
+    bullets: [
+      { label: "Outdated Technology", detail: "Comdata's platform is one of the oldest in the industry. Fleet managers regularly complain about clunky tools and a frustrating interface." },
+      { label: "Terrible Customer Service", detail: "Support issues are known to drag on for months. Card freezes, billing errors, and disputes can sit unresolved for a long time." },
+      { label: "Cash Flow Risk", detail: "For owner-operators or small fleets, a card issue that takes weeks or months to fix isn't just annoying — it can seriously hurt operations." }
+    ],
+    promptContext: `Comdata is an old platform with notoriously bad customer service. Issues like card freezes, billing errors, and disputes are known to take weeks or even months to resolve. For small fleets and owner-operators this is a real operational and cash flow risk.`
+  },
+  "RTS Financial": {
+    summary: "⚡ In-network transaction fees + $6/month per activated card — costs stack up and eat into savings",
+    bullets: [
+      { label: "Monthly Card Fee", detail: "$6 per activated card every month. A fleet with 10 trucks pays $60/month just to keep cards active — before any fuel is bought." },
+      { label: "Transaction Fees on Top", detail: "RTS also charges in-network transaction fees on fuel purchases, similar to TCS. The fees stack on top of the monthly cost." },
+      { label: "Real Math Hurts", detail: "When you add monthly card fees plus per-transaction fees, the net savings often end up much smaller than what was pitched in the sales call." }
+    ],
+    promptContext: `RTS Financial charges $6 per activated card every month plus in-network transaction fees on fuel purchases. A 10-truck fleet pays $60/month just to keep cards active, before any transaction fees hit. The stacked costs often make the real savings much smaller than advertised.`
+  },
+  "MudFlap": {
+    summary: "⚡ Advertised savings often don't match the actual report — drivers end up saving less than expected",
+    bullets: [
+      { label: "Price Discrepancy", detail: "MudFlap shows an advertised savings rate upfront — but when customers pull their actual savings report, the real number is often lower than expected." },
+      { label: "Report Surprise", detail: "Fleet managers regularly notice that what they thought they were saving per gallon doesn't match what MudFlap actually delivered at the pump." },
+      { label: "Inconsistent Pricing", detail: "Savings can vary by location and time of day, making it hard to predict or count on consistent discounts across an entire fleet." }
+    ],
+    promptContext: `MudFlap advertises savings rates upfront but customers frequently find that when they pull their actual savings report, the real savings per gallon are lower than expected. Pricing varies by location and time, making it inconsistent and hard to rely on across a fleet.`
+  }
+};
+
+let history = JSON.parse(localStorage.getItem('nepq_history_v2') || '[]');
+let activeIndex = null;
+
+document.getElementById('competitor-select').addEventListener('change', function() {
+  const val = this.value;
+  const preview = document.getElementById('comp-preview');
+  const previewText = document.getElementById('comp-preview-text');
+  if (val && COMPETITOR_INTEL[val]) {
+    preview.style.display = 'block';
+    previewText.textContent = COMPETITOR_INTEL[val].summary;
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  if (!history.length) { list.innerHTML = '<div class="empty-history">No analyses yet.<br/>Your history will appear here.</div>'; return; }
+  list.innerHTML = history.map((item, i) => `
+    <div class="history-item ${activeIndex === i ? 'active' : ''}" onclick="loadFromHistory(${i})">
+      <div class="h-row">
+        <div class="h-cat">${item.category || 'objection'}</div>
+        ${item.competitor ? `<div class="h-comp-badge">${escHtml(item.competitor)}</div>` : ''}
+      </div>
+      <div class="h-text">${escHtml(item.objection)}</div>
+      <div class="h-time">${item.time}</div>
+    </div>`).join('');
+}
+
+function loadFromHistory(i) {
+  activeIndex = i;
+  renderHistory();
+  const item = history[i];
+  document.getElementById('objection-input').value = item.objection;
+  document.getElementById('context-select').value = item.context || '';
+  document.getElementById('industry-select').value = item.industry || '';
+  document.getElementById('competitor-select').value = item.competitor || '';
+  document.getElementById('competitor-select').dispatchEvent(new Event('change'));
+  renderResult(item.result, item.objection, item.competitor);
+}
+
+function clearHistory() {
+  history = []; activeIndex = null;
+  localStorage.removeItem('nepq_history_v2');
+  renderHistory();
+}
+
+function loadSample(text, comp) {
+  document.getElementById('objection-input').value = text;
+  if (comp) {
+    document.getElementById('competitor-select').value = comp;
+    document.getElementById('competitor-select').dispatchEvent(new Event('change'));
+  }
+  document.getElementById('objection-input').focus();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setLoading(on) {
+  document.getElementById('spinner').style.display = on ? 'block' : 'none';
+  document.getElementById('btn-label').textContent = on ? 'Analyzing…' : 'Analyze Objection';
+  document.getElementById('analyze-btn').disabled = on;
+}
+
+function showLoading() {
+  document.getElementById('output-zone').innerHTML = `
+    <div class="result-card">
+      <div class="loading-card"><div class="skeleton sk-line short"></div><div class="skeleton sk-line med"></div></div>
+      <div class="loading-card"><div class="skeleton sk-line short"></div><div class="skeleton sk-line long"></div><div class="skeleton sk-line med"></div></div>
+      <div class="loading-card">
+        <div class="skeleton sk-line short"></div><div class="skeleton sk-line long"></div>
+        <div class="skeleton sk-line med"></div><div class="skeleton sk-line long"></div>
+      </div>
+    </div>`;
+}
+
+function renderResult(parsed, objection, competitor) {
+  const intel = competitor ? COMPETITOR_INTEL[competitor] : null;
+  const compIntelHtml = intel ? `
+    <div class="comp-intel-card">
+      <div class="section-label">Competitor Intel — ${escHtml(competitor)}</div>
+      <div class="intel-list">
+        ${intel.bullets.map(b => `
+          <div class="intel-item">
+            <div class="intel-icon">⚡</div>
+            <div class="intel-text"><strong>${escHtml(b.label)}:</strong> ${escHtml(b.detail)}</div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  document.getElementById('output-zone').innerHTML = `
+    <div class="result-card">
+      <div class="result-meta">
+        ${parsed.category ? `<span class="tag tag-cat">${escHtml(parsed.category)}</span>` : ''}
+        ${competitor ? `<span class="tag tag-comp">vs ${escHtml(competitor)}</span>` : ''}
+        <span class="tag tag-tone">Calm · Curious · Disarming</span>
+      </div>
+      <div class="objection-quote">"${escHtml(objection)}"</div>
+      ${compIntelHtml}
+      <div class="section-card">
+        <div class="section-label">What They're Really Thinking</div>
+        <div class="concern-text">${escHtml(parsed.concern || '')}</div>
+      </div>
+      <div class="section-card">
+        <div class="section-label">NEPQ Questions — Use These Live</div>
+        <div class="questions-list">
+          ${(parsed.questions || []).map(q => `
+            <div class="question-item">
+              <div class="q-bullet">→</div>
+              <div class="q-content">
+                <div class="q-type">${escHtml(q.type || '')}</div>
+                <div class="q-text">${escHtml(q.text || '')}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="warning-card">
+        <div class="section-label">Don't Say This</div>
+        <div class="warning-text">${escHtml(parsed.warning || '')}</div>
+      </div>
+    </div>`;
+}
+
+async function analyzeObjection() {
+  const objection = document.getElementById('objection-input').value.trim();
+  if (!objection) { document.getElementById('objection-input').focus(); return; }
+  const context = document.getElementById('context-select').value;
+  const industry = document.getElementById('industry-select').value;
+  const competitor = document.getElementById('competitor-select').value;
+  const intel = competitor ? COMPETITOR_INTEL[competitor] : null;
+
+  setLoading(true);
+  showLoading();
+
+  const compBlock = intel ? `
+The prospect currently uses ${competitor}. Here is their real weakness — use it to shape all 3 questions:
+${intel.promptContext}
+
+How to use this in the questions:
+- Question 1 (Clarifying): Ask something soft and curious about their experience — don't mention the weakness yet. Just get them talking.
+- Question 2 (Problem Awareness): Gently point toward the specific pain (fees, bad service, savings gap) without being blunt. Plant the seed, let them connect it.
+- Question 3 (Consequence / Future): Go more direct now. You can reference the actual issue — the fee amount, the wait time, the savings discrepancy — as a curious question that makes them think about the real cost of staying.` : `
+When it fits naturally, bring up real fuel card pain points like:
+- hidden fees, getting paid slow, fuel costs going up, hassle of switching, drivers not using the card right, not knowing where the money goes`;
+
+  const systemPrompt = `You are a sales coach who knows Jeremy Miner's NEPQ method cold. Analyze the objection and respond ONLY with valid JSON — no markdown, no backticks, no extra text.
+
+JSON:
+{
+  "category": "one of: price | timing | trust | authority | status quo | no perceived need | brush-off | bad past experience",
+  "concern": "1-2 short sentences — what is this prospect really holding onto? Casual and simple, 7th grade reading level.",
+  "questions": [
+    {"type": "Clarifying Question", "text": "..."},
+    {"type": "Problem Awareness Question", "text": "..."},
+    {"type": "Consequence / Future Question", "text": "..."}
+  ],
+  "warning": "One short example of a bad, salesy response to avoid. Casual tone."
+}
+
+Rules for all 3 questions:
+- Talk like a real person — short, casual, easy to say out loud on a phone call
+- 7th grade reading level — short words, short sentences
+- Max 18 words each
+- Each question must feel totally different from the others
+- Never pitch, convince, or rebut — only ask curious questions
+- Never use: "Why would you…", "Don't you think…", "Wouldn't you agree…", "What if I told you…"
+- Must be easy to glance at and read instantly mid-call
+${compBlock}`;
+
+  const userMsg = `Objection: "${objection}"${context ? `\nContext: ${context}` : ''}${industry ? `\nIndustry: ${industry}` : ''}${competitor ? `\nProspect uses: ${competitor}` : ''}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+    const data = await res.json();
+    const raw = (data.content || []).map(b => b.text || '').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+
+    renderResult(parsed, objection, competitor);
+
+    const entry = { objection, context, industry, competitor, category: parsed.category, result: parsed, time: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) };
+    history.unshift(entry);
+    if (history.length > 30) history = history.slice(0, 30);
+    localStorage.setItem('nepq_history_v2', JSON.stringify(history));
+    activeIndex = 0;
+    renderHistory();
+
+  } catch(err) {
+    document.getElementById('output-zone').innerHTML = `<div class="error-card"><strong>Something went wrong.</strong><br/>${escHtml(err.message || 'Please try again.')}</div>`;
+  }
+  setLoading(false);
+}
+
+document.getElementById('objection-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyzeObjection();
+});
+
+renderHistory();
+</script>
+</body>
+</html>
